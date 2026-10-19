@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZTE F8648P Config Password Recovery</title>
+<meta name="description" content="Recover the admin password from a ZTE ZXHN F8648P config.bin backup, entirely in your browser.">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --ink: #1a1d21;
+    --muted: #5a6470;
+    --line: #dfe3e8;
+    --accent: #2f6fed;
+    --accent-ink: #ffffff;
+    --ok-bg: #e7f6ec; --ok-ink: #146b35; --ok-line: #b6e2c4;
+    --err-bg: #fdecec; --err-ink: #a21c1c; --err-line: #f4c2c2;
+    --code-bg: #f0f2f5;
+    --field: #ffffff;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --panel: #171b21; --ink: #e8eaed; --muted: #9aa4b0;
+      --line: #2a2f37; --accent: #5b8cff; --accent-ink: #0b0e12;
+      --ok-bg: #11291a; --ok-ink: #6fd694; --ok-line: #1f4a30;
+      --err-bg: #2a1414; --err-ink: #f29a9a; --err-line: #4a1f1f;
+      --code-bg: #0e1116; --field: #0f1317;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --panel: #171b21; --ink: #e8eaed; --muted: #9aa4b0;
+    --line: #2a2f37; --accent: #5b8cff; --accent-ink: #0b0e12;
+    --ok-bg: #11291a; --ok-ink: #6fd694; --ok-line: #1f4a30;
+    --err-bg: #2a1414; --err-ink: #f29a9a; --err-line: #4a1f1f;
+    --code-bg: #0e1116; --field: #0f1317;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px; box-shadow: var(--shadow); margin-bottom: 18px;
+  }
+  label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: .92rem; }
+  label:first-child { margin-top: 0; }
+  .hint { font-weight: 400; color: var(--muted); font-size: .84rem; }
+  input[type=text], input[type=file] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 9px; background: var(--field); color: var(--ink); font-size: .95rem;
+    font-family: inherit;
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  input[type=file] { padding: 9px; cursor: pointer; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > div { flex: 1 1 220px; }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: .92rem; }
+  .check input { width: 16px; height: 16px; }
+  button {
+    margin-top: 20px; width: 100%; padding: 12px 16px; border: 0; border-radius: 10px;
+    background: var(--accent); color: var(--accent-ink); font-size: 1rem; font-weight: 650;
+    cursor: pointer; font-family: inherit;
+  }
+  button:disabled { opacity: .5; cursor: progress; }
+  button:not(:disabled):hover { filter: brightness(1.05); }
+  .result { display: none; }
+  .result.show { display: block; }
+  .pwfield {
+    display: flex; align-items: center; gap: 10px; background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 6px 0 2px;
+  }
+  .pwfield code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 1.15rem; word-break: break-all; flex: 1;
+  }
+  .mini { font-size: .78rem; padding: 6px 10px; width: auto; margin: 0; border-radius: 7px;
+          background: transparent; color: var(--accent); border: 1px solid var(--line); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .9rem; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+  .badge { font-size: .74rem; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .status { margin-top: 14px; padding: 11px 13px; border-radius: 10px; font-size: .9rem; display: none; }
+  .status.show { display: block; }
+  .status.ok  { background: var(--ok-bg);  color: var(--ok-ink);  border: 1px solid var(--ok-line); }
+  .status.err { background: var(--err-bg); color: var(--err-ink); border: 1px solid var(--err-line); }
+  .note { color: var(--muted); font-size: .84rem; }
+  .note code, p code, li code { background: var(--code-bg); padding: 1px 5px; border-radius: 5px;
+         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85em; }
+  details { margin-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  .privacy { display: flex; gap: 10px; align-items: flex-start; }
+  .privacy svg { flex: 0 0 auto; margin-top: 2px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ZTE F8648P password recovery</h1>
+  <p class="sub">Recover the admin password from a ZTE&nbsp;ZXHN&nbsp;F8648P <code>config.bin</code> backup.</p>
+
+  <div class="card">
+    <div class="privacy note">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span><strong>Runs entirely in your browser.</strong> Your config file, MAC, serial and the
+      recovered password are processed locally and never sent anywhere. No network requests, no
+      dependencies — you can disconnect from the internet and it still works.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="file">Config backup <span class="hint">— the <code>config.bin</code> you exported from the router</span></label>
+    <input type="file" id="file" accept=".bin,application/octet-stream">
+
+    <div class="row">
+      <div>
+        <label for="mac">Device MAC <span class="hint">— on the label</span></label>
+        <input type="text" id="mac" placeholder="00:11:22:33:44:55" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="serial">Serial / GPON SN <span class="hint">— starts with ZTEG</span></label>
+        <input type="text" id="serial" placeholder="ZTEGD1111111" autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+
+    <label class="check"><input type="checkbox" id="all"> Show every account, not just admin</label>
+
+    <button id="go">Recover password</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card result" id="result">
+    <div id="adminBox"></div>
+    <div id="tableBox"></div>
+    <button class="mini" id="dlXml" style="margin-top:16px">Download decrypted XML</button>
+  </div>
+
+  <details>
+    <summary>How it works &amp; requirements</summary>
+    <div class="note" style="margin-top:10px">
+      <p>The backup is an AES-256-CBC + zlib container whose key is derived from the device's own
+      MAC and serial:</p>
+      <p><code>key = SHA256( serial[4:12].upper() + reverse(mac&nbsp;octets).lower() )</code><br>
+         <code>iv&nbsp; = SHA256("ZTE%FN$GponNJ025")[:16]</code></p>
+      <p>Because the key is tied to hardware whose label you must physically read, this is a recovery
+      tool for a device you own. Tested on F8648P firmware V2.0.12P1N22 / N28 / N29.</p>
+      <p>Needs a browser with <code>DecompressionStream</code> (Chrome/Edge&nbsp;80+, Firefox&nbsp;113+,
+      Safari&nbsp;16.4+) and Web Crypto.</p>
+    </div>
+  </details>
+</div>
+
+<script>
+"use strict";
+/* ===== core (identical logic to zte_admin_pass.py; validated byte-for-byte) ===== */
+
+const SBOX = new Uint8Array([
+0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
+0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
+0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
+0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,
+0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,
+0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,
+0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,
+0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,
+0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,
+0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,
+0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,
+0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,
+0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,
+0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,
+0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,
+0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16]);
+const INV_SBOX = new Uint8Array(256);
+for (let i = 0; i < 256; i++) INV_SBOX[SBOX[i]] = i;
+
+function gmul(a, b) {
+  let p = 0;
+  for (let i = 0; i < 8; i++) {
+    if (b & 1) p ^= a;
+    const hi = a & 0x80; a = (a << 1) & 0xff; if (hi) a ^= 0x1b; b >>= 1;
+  }
+  return p & 0xff;
+}
+function expandKey(key) {
+  const Nk = 8, Nr = 14, w = new Uint8Array(16 * (Nr + 1));
+  w.set(key.subarray(0, 32), 0);
+  let rcon = 1;
+  for (let i = Nk; i < 4 * (Nr + 1); i++) {
+    let t = [w[4*(i-1)], w[4*(i-1)+1], w[4*(i-1)+2], w[4*(i-1)+3]];
+    if (i % Nk === 0) { t = [t[1],t[2],t[3],t[0]].map(b => SBOX[b]); t[0] ^= rcon; rcon = gmul(rcon, 2); }
+    else if (i % Nk === 4) { t = t.map(b => SBOX[b]); }
+    for (let j = 0; j < 4; j++) w[4*i+j] = w[4*(i-Nk)+j] ^ t[j];
+  }
+  return w;
+}
+function invShiftRows(s) {
+  for (let r = 1; r < 4; r++) {
+    const row = [s[r], s[r+4], s[r+8], s[r+12]];
+    for (let c = 0; c < 4; c++) s[r + 4*c] = row[(c - r + 4) % 4];
+  }
+}
+function invMixColumns(s) {
+  for (let c = 0; c < 4; c++) {
+    const i = 4*c, a0 = s[i], a1 = s[i+1], a2 = s[i+2], a3 = s[i+3];
+    s[i]   = gmul(a0,14) ^ gmul(a1,11) ^ gmul(a2,13) ^ gmul(a3,9);
+    s[i+1] = gmul(a0,9)  ^ gmul(a1,14) ^ gmul(a2,11) ^ gmul(a3,13);
+    s[i+2] = gmul(a0,13) ^ gmul(a1,9)  ^ gmul(a2,14) ^ gmul(a3,11);
+    s[i+3] = gmul(a0,11) ^ gmul(a1,13) ^ gmul(a2,9)  ^ gmul(a3,14);
+  }
+}
+function invCipherBlock(block, w) {
+  const Nr = 14, s = Uint8Array.from(block);
+  for (let j = 0; j < 16; j++) s[j] ^= w[16*Nr + j];
+  for (let round = Nr - 1; round >= 1; round--) {
+    invShiftRows(s);
+    for (let j = 0; j < 16; j++) s[j] = INV_SBOX[s[j]];
+    for (let j = 0; j < 16; j++) s[j] ^= w[16*round + j];
+    invMixColumns(s);
+  }
+  invShiftRows(s);
+  for (let j = 0; j < 16; j++) s[j] = INV_SBOX[s[j]];
+  for (let j = 0; j < 16; j++) s[j] ^= w[j];
+  return s;
+}
+function aesCbcDecryptNoPad(key, iv, ct) {
+  const w = expandKey(key), out = new Uint8Array(ct.length);
+  let prev = Uint8Array.from(iv);
+  for (let off = 0; off < ct.length; off += 16) {
+    const block = ct.subarray(off, off + 16), dec = invCipherBlock(block, w);
+    for (let j = 0; j < 16; j++) out[off + j] = dec[j] ^ prev[j];
+    prev = Uint8Array.from(block);
+  }
+  return out;
+}
+
+const utf8 = s => new TextEncoder().encode(s);
+async function sha256(bytes) { return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)); }
+async function inflate(u8) {
+  const stream = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+function concat(parts) {
+  let n = 0; for (const p of parts) n += p.length;
+  const out = new Uint8Array(n); let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+function composeKey(mac, serial) {
+  return serial.slice(4, 12).toUpperCase() + mac.split(':').reverse().join('').toLowerCase();
+}
+
+const MAGIC = [0x99999999, 0x44444444, 0x55555555, 0xAAAAAAAA];
+const SIG_MAGIC = 0x04030201, IV_SEED = 'ZTE%FN$GponNJ025';
+
+async function decryptConfig(raw, mac, serial) {
+  const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+  let p = 0;
+  const u32 = () => { const v = dv.getUint32(p, false); p += 4; return v; };
+  const m = [u32(), u32(), u32(), u32()];
+  if (m[0] === MAGIC[0] && m[1] === MAGIC[1] && m[2] === MAGIC[2] && m[3] === MAGIC[3]) p += 112; else p = 0;
+  const pos = p;
+  const s0 = u32(); u32(); const s2 = u32();
+  if (s0 === SIG_MAGIC) p += s2; else p = pos;
+  p += 60;
+  const encParts = []; let total = 0;
+  for (;;) {
+    const decSize = u32(), chunkSize = u32(), more = u32();
+    encParts.push(raw.subarray(p, p + chunkSize)); p += chunkSize; total += decSize;
+    if (more === 0) break;
+  }
+  const enc = concat(encParts);
+  const key = await sha256(utf8(composeKey(mac, serial)));
+  const iv  = (await sha256(utf8(IV_SEED))).subarray(0, 16);
+  const dec = aesCbcDecryptNoPad(key, iv, enc).subarray(0, total);
+  const idv = new DataView(dec.buffer, dec.byteOffset, dec.byteLength);
+  let ip = 60; const outParts = [];
+  while (ip + 12 <= dec.length) {
+    const clen = idv.getUint32(ip + 4, false), more = idv.getUint32(ip + 8, false);
+    ip += 12;
+    outParts.push(await inflate(dec.subarray(ip, ip + clen)));
+    ip += clen;
+    if (more === 0) break;
+  }
+  return concat(outParts);
+}
+
+const LEVELS = { "0": "superadmin", "1": "admin", "2": "user" };
+
+function parseAccounts(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  if (doc.querySelector('parsererror')) return [];
+  for (const tbl of doc.getElementsByTagName('Tbl')) {
+    if (tbl.getAttribute('name') !== 'DevAuthInfo') continue;
+    const rows = [];
+    for (const row of tbl.getElementsByTagName('Row')) {
+      const kv = {};
+      for (const dm of row.getElementsByTagName('DM')) kv[dm.getAttribute('name')] = dm.getAttribute('val');
+      if (kv.User || kv.Pass) rows.push(kv);
+    }
+    return rows;
+  }
+  return [];
+}
+
+function pickAdmin(rows) {
+  const cand = rows.filter(k => k.Enable === '1' && k.Pass);
+  cand.sort((a, b) =>
+    (Number(a.User !== 'admin') - Number(b.User !== 'admin')) ||
+    (parseInt(a.Level || '9', 10) - parseInt(b.Level || '9', 10)));
+  return cand[0] || null;
+}
+
+/* ===== UI ===== */
+const $ = id => document.getElementById(id);
+let lastXml = null;
+
+function setStatus(msg, kind) {
+  const el = $('status');
+  el.textContent = msg;
+  el.className = 'status show ' + (kind || '');
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function run() {
+  const fileInput = $('file');
+  const mac = $('mac').value.trim();
+  const serial = $('serial').value.trim();
+  const showAll = $('all').checked;
+
+  $('result').classList.remove('show');
+  if (!fileInput.files[0]) return setStatus('Choose your config.bin file first.', 'err');
+  if (!/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(mac)) return setStatus('Enter the MAC as 6 hex pairs, e.g. 11:22:33:44:55:66', 'err');
+  if (serial.length < 12) return setStatus('Enter the full serial / GPON SN, e.g. ZTEGD1111111', 'err');
+
+  $('go').disabled = true;
+  setStatus('Decrypting locally…', '');
+  try {
+    const raw = new Uint8Array(await fileInput.files[0].arrayBuffer());
+    const xmlBytes = await decryptConfig(raw, mac, serial);
+    const xml = new TextDecoder('utf-8').decode(xmlBytes);
+    if (!xml.trimStart().startsWith('<')) throw new Error('decrypted data is not XML');
+    lastXml = xml;
+
+    const rows = parseAccounts(xml);
+    if (!rows.length) throw new Error('no DevAuthInfo accounts found');
+    const admin = pickAdmin(rows);
+
+    let html = '';
+    if (admin) {
+      html += `<label>Recovered admin account</label>
+        <div class="note" style="margin:0 0 4px">user: <code>${esc(admin.User)}</code></div>
+        <div class="pwfield"><code id="pw">${esc(admin.Pass)}</code>
+          <button class="mini" id="copyPw">Copy</button></div>`;
+    }
+    $('adminBox').innerHTML = html;
+
+    if (showAll) {
+      let t = `<label style="margin-top:18px">All accounts (DevAuthInfo)</label>
+        <table><tr><th>User</th><th>Password</th><th>Level</th><th>State</th></tr>`;
+      for (const kv of rows) {
+        const lvl = LEVELS[kv.Level] || kv.Level || '?';
+        const state = kv.Enable === '1' ? 'enabled' : 'disabled';
+        t += `<tr><td><code>${esc(kv.User)}</code></td><td><code>${esc(kv.Pass)}</code></td>
+              <td>${esc(lvl)}</td><td><span class="badge">${state}</span></td></tr>`;
+      }
+      t += `</table>`;
+      $('tableBox').innerHTML = t;
+    } else {
+      $('tableBox').innerHTML = '';
+    }
+
+    $('result').classList.add('show');
+    setStatus('Done — decrypted in your browser.', 'ok');
+
+    const copyBtn = $('copyPw');
+    if (copyBtn) copyBtn.onclick = () => {
+      navigator.clipboard?.writeText(admin.Pass).then(() => { copyBtn.textContent = 'Copied'; setTimeout(() => copyBtn.textContent = 'Copy', 1200); });
+    };
+  } catch (e) {
+    setStatus('Decryption failed (' + e.message + '). Double-check the MAC and serial match this device.', 'err');
+  } finally {
+    $('go').disabled = false;
+  }
+}
+
+$('go').addEventListener('click', run);
+$('dlXml').addEventListener('click', () => {
+  if (!lastXml) return;
+  const blob = new Blob([lastXml], { type: 'application/xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'config.xml';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>
